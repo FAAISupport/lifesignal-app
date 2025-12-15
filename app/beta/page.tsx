@@ -169,11 +169,14 @@ export default function BetaPage() {
                 </div>
 
                 <label style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <input name="consent" type="checkbox" required style={{ marginTop: 4 }} />
-                  <span className="small">
-                    I agree to be contacted about the LifeSignal beta. I understand LifeSignal is not 911 and not a medical alert device.
-                  </span>
-                </label>
+  <input name="consent" type="checkbox" required style={{ marginTop: 4 }} />
+  <span className="small">
+    I agree to be contacted about the LifeSignal beta. If I provide a phone number, I consent to receive SMS messages
+    related to onboarding, reminders, and account updates. Message &amp; data rates may apply. Reply STOP to opt out.
+    LifeSignal is not 911 and not a medical alert device.
+  </span>
+</label>
+
 
                 <button className="btn btnPrimary" disabled={status === "loading"} type="submit">
                   {status === "loading" ? "Submitting…" : "Submit application"}
