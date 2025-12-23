@@ -1,108 +1,73 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import crypto from "crypto";
 
-function parseForm(body: string) {
-  const params = new URLSearchParams(body);
-  return Object.fromEntries(params.entries());
-}
+export const runtime = "nodejs"; // Twilio webhooks should run on Node (not Edge)
 
-function verifyTwilioSignature({
-  authToken,
-  signature,
-  url,
-  params,
-}: {
-  authToken: string;
-  signature: string | null;
-  url: string;
-  params: Record<string, string>;
-}) {
-  if (!signature) return false;
-
-  const sortedKeys = Object.keys(params).sort();
-  const data = url + sortedKeys.map((k) => `${k}${params[k] ?? ""}`).join("");
-
-  const digest = crypto.createHmac("sha1", authToken).update(data).digest("base64");
-
-  try {
-    return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature));
-  } catch {
-    return false;
-  }
-}
-
-function twiml(message: string) {
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${message}</Message></Response>`;
+function twimlResponse(xml: string) {
+  return new NextResponse(xml, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/xml; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
 }
 
 export async function POST(req: Request) {
-  const rawBody = await req.text();
-  const form = parseForm(rawBody);
+  try {
+    // Twilio sends x-www-form-urlencoded by default
+    const contentType = req.headers.get("content-type") || "";
+    let form: URLSearchParams;
 
-  const from = (form.From || "").trim();
-  const bodyRaw = (form.Body || "").trim();
-  const messageSid = (form.MessageSid || "").trim();
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      const bodyText = await req.text();
+      form = new URLSearchParams(bodyText);
+    } else if (contentType.includes("application/json")) {
+      const json = await req.json().catch(() => ({}));
+      form = new URLSearchParams(Object.entries(json).map(([k, v]) => [k, String(v)]));
+    } else {
+      // fallback
+      const bodyText = await req.text();
+      form = new URLSearchParams(bodyText);
+    }
 
-  const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN!;
-  const webhookUrl = process.env.TWILIO_WEBHOOK_URL!;
+    const from = form.get("From") || "";
+    const body = (form.get("Body") || "").trim().toLowerCase();
 
-  const signature = req.headers.get("x-twilio-signature");
-  const isValid = verifyTwilioSignature({
-    authToken: twilioAuthToken,
-    signature,
-    url: webhookUrl,
-    params: form as Record<string, string>,
-  });
+    // Minimal logic: reply to any inbound SMS with a friendly confirmation.
+    // You can expand this later to match seniors, log messages to Supabase, etc.
+    const message =
+      body === "stop"
+        ? "You can stop messages by replying STOP. If you meant something else, reply HELP."
+        : "Thanks — LifeSignal received your message. If you need help, reply HELP.";
 
-  if (!isValid) return new NextResponse("Invalid signature", { status: 403 });
+    const twiml =
+      `<?xml version="1.0" encoding="UTF-8"?>` +
+      `<Response>` +
+      `<Message>${escapeXml(message)}</Message>` +
+      `</Response>`;
 
-  const normalized = bodyRaw.toLowerCase().replace(/\s+/g, " ").trim();
-  const isYes = normalized === "yes" || normalized === "y";
-  const isStop =
-    normalized === "stop" ||
-    normalized === "unsubscribe" ||
-    normalized === "cancel" ||
-    normalized === "end" ||
-    normalized === "quit";
-  const isHelp = normalized === "help" || normalized === "info";
+    // Optional: quick debug log (Vercel logs only)
+    console.log("[twilio-inbound]", { from, body });
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+    return twimlResponse(twiml);
+  } catch (err) {
+    console.error("[twilio-inbound] error", err);
 
-  const { data: senior, error: seniorErr } = await supabase
-    .from("seniors")
-    .select("id, full_name, phone")
-    .eq("phone", from)
-    .maybeSingle();
+    const twiml =
+      `<?xml version="1.0" encoding="UTF-8"?>` +
+      `<Response>` +
+      `<Message>Sorry — something went wrong on our end.</Message>` +
+      `</Response>`;
 
-  if (seniorErr) console.error("Senior lookup error:", seniorErr);
-
-  if (!senior?.id) {
-    return new NextResponse(twiml("Thanks! (No account found for this number.)"), {
-      status: 200,
-      headers: { "Content-Type": "text/xml" },
-    });
+    return twimlResponse(twiml);
   }
+}
 
-  // STOP = opt out (record it)
-  if (isStop) {
-    await supabase.from("sms_consents").upsert(
-      {
-        senior_id: senior.id,
-        phone: from,
-        consented: false,
-        consent_method: "sms_stop",
-        consent_text:
-          "LifeSignal: Reply YES to confirm and start. Reply STOP to opt out. Msg&data rates may apply.",
-        consent_text_version: "v1",
-        consented_at: new Date().toISOString(),
-        twilio_message_sid: messageSid || null,
-      },
-      { onConflict: "phone,senior_id" }
-    );
-
-    return new Nex
+function escapeXml(input: string) {
+  return input
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}

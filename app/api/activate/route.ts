@@ -1,38 +1,36 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function POST() {
-  try {
-    const {
-      data: { user },
-      error: authErr
-    } = await supabase.auth.getUser();
+export async function POST(req: Request) {
+  const auth = req.headers.get("authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
 
-    if (authErr || !user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
-    const { error: updErr } = await supabase
-      .from("beta_signups")
-      .update({
-        status: "activated",
-        activated_at: new Date().toISOString(),
-      })
-      .eq("auth_user_id", user.id);
-
-    if (updErr) {
-      console.error(updErr);
-      return NextResponse.json({ error: "Activation failed" }, { status: 500 });
-    }
-
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Unexpected error" }, { status: 500 });
+  if (!token) {
+    return new NextResponse("Unauthorized", { status: 401 });
   }
+
+  // Validate token with Supabase
+  const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
+  if (userErr || !userData?.user?.email) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+
+  const email = userData.user.email.toLowerCase();
+
+  // Mark signup activated (if exists)
+  const { error } = await supabaseAdmin
+    .from("beta_signups")
+    .update({ status: "activated", activated_at: new Date().toISOString() })
+    .eq("email", email);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true }, { status: 200 });
 }
