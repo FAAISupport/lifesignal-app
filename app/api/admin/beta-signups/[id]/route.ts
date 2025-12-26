@@ -3,10 +3,10 @@ import { NextResponse } from "next/server";
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = supabaseAdmin();
+  const { id } = await params;
 
-  // TODO: paste your original logic back in here if you overwrote it previously.
-  return NextResponse.json({ ok: true, id: params.id });
+  return NextResponse.json({ ok: true, id });
 }
