@@ -1,8 +1,36 @@
 {
   "crons": [
     {
-      "path": "/api/cron/checkin-timeouts?key=$CRON_SECRET",
+      "path": "/api/cron/tick",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/schedule-due-attempts",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/send-due-messages",
+      "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron/process-twilio-status",
+      "schedule": "*/3 * * * *"
+    },
+    {
+      "path": "/api/cron/escalate-missed",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/close-stale-alerts",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/daily-metrics",
+      "schedule": "15 8 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup",
+      "schedule": "30 8 * * *"
     }
   ]
 }
