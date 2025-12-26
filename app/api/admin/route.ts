@@ -1,7 +1,7 @@
-﻿import { NextResponse } from "next/server";
+import {{ supabaseAdmin }} from "@/lib/supabase-admin";
+import {{ NextResponse }} from "next/server";
 
-export const runtime = "nodejs";
-
-export async function GET() {
-  return NextResponse.json({ ok: true, route: "/api/admin" });
-}
+export async function GET(req: Request) {{
+  const supabase = supabaseAdmin();
+  return NextResponse.json({{ ok: true }});
+}}
