@@ -1,14 +1,9 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { NextResponse } from "next/server";
 
-export async function GET(
-  req: Request,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function POST(req: Request) {
   const supabase = supabaseAdmin();
 
-  const { id } = await context.params;
-
-  // TODO: paste your original logic back in here (this is only the build-safe wrapper)
-  return NextResponse.json({ ok: true, id });
+  // TODO: paste your original beta signup logic back in here if it was overwritten.
+  return NextResponse.json({ ok: true });
 }
