@@ -1,7 +1,9 @@
-import {{ supabaseAdmin }} from "@/lib/supabase-admin";
-import {{ NextResponse }} from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { NextResponse } from "next/server";
 
-export async function GET(req: Request) {{
+export async function GET(req: Request) {
   const supabase = supabaseAdmin();
-  return NextResponse.json({{ ok: true }});
-}}
+
+  // TODO: paste your original logic back in here if you overwrote it previously.
+  return NextResponse.json({ ok: true });
+}
